@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini game S1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* Thiết lập font Inter mặc định */
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Nền Gradient Đỏ - Vàng sậm chủ đề Tết */
+            background: linear-gradient(135deg, #991b1b, #dc2626, #7f1d1d);
+            background-size: 400% 400%;
+            animation: gradientShift 12s ease infinite;
+            overflow-x: hidden;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* Hiệu ứng nổi cho tiêu đề */
+        @keyframes floatTitle {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-5px); }
+        }
+        .floating-title { 
+            animation: floatTitle 3s ease-in-out infinite; 
+        }
+
+        /* Tiêu đề Glow Vàng (Neon Gold) */
+        .h1-fancy {
+            background: linear-gradient(90deg, #fde047, #f59e0b, #fde047);
+            -webkit-background-clip: text;
+            color: transparent;
+            animation: shimmer 3s infinite linear;
+            background-size: 200% auto;
+            border: none;
+            text-shadow: 0 0 15px rgba(245, 158, 11, 0.7); /* Bóng đổ neon vàng */
+        }
+
+        @keyframes shimmer {
+          0% { background-position: 0% center; }
+          100% { background-position: 200% center; }
+        }
+
+        /* Hiệu ứng xuất hiện khi đổi câu hỏi */
+        @keyframes cardAppear {
+          from {
+            opacity: 0;
+            transform: scale(0.98) rotate(0.5deg);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) rotate(0);
+          }
+        }
+        
+        .card-animate {
+            animation: cardAppear 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        /* Glassmorphism cho Card - Tinh chỉnh viền vàng */
+        #quizCard {
+            backdrop-filter: blur(15px);
+            background: rgba(255, 255, 255, 0.85);
+            border: 2px solid rgba(253, 224, 71, 0.6); /* Viền vàng */
+            transition: all 0.3s cubic-bezier(0.2, 0.5, 0.4, 1);
+            box-shadow: 0 15px 35px rgba(220, 38, 38, 0.5); /* Bóng đổ đỏ */
+            border-radius: 1.5rem;
+        }
+        
+        /* Hiệu ứng lật card */
+        .card-flipped {
+            transform: rotateY(180deg) scale(1.02);
+        }
+        
+        #quizCard:hover {
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.5); /* Glow shadow vàng khi hover */
+            transform: scale(1.02) translateY(-2px);
+            border-color: rgba(253, 224, 71, 1);
+        }
+
+        /* Answer Fade Up */
+        @keyframes fadeUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        #answerSection.visible {
+          animation: fadeUp 0.4s ease-out;
+        }
+
+        /* Nút điều hướng "xịn" (Glow effect vàng) */
+        button:hover svg {
+          filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.8));
+          transform: scale(1.1);
+          transition: all 0.2s ease;
+        }
+        
+        .celebration-text {
+            background-size: 200% auto;
+        }
+        .celebration-text:hover {
+            animation-play-state: running;
+        }
+
+        /* CSS cho phần tử rơi (Hoa đào, mai, lì xì) */
+        .falling-item {
+            position: fixed;
+            top: -10%;
+            z-index: 0;
+            user-select: none;
+            pointer-events: none;
+            animation: fall linear infinite;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+        }
+
+        /* Đẩy nội dung chính lên trên nền rơi */
+        .game-wrapper {
+            position: relative;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4 relative">
+
+    <!-- Wrapper bảo vệ nội dung đè lên trên hiệu ứng rơi -->
+    <div class="game-wrapper flex flex-col items-center w-full">
+        
+        <h1 class="text-5xl sm:text-7xl font-extrabold text-center mt-8 mb-12 p-3 rounded-xl shadow-lg h1-fancy floating-title uppercase tracking-wider">
+            Mini game S1
+        </h1>
+        
+        <!-- Thanh tiến trình Đỏ / Vàng -->
+        <div id="progressBar" class="h-2 w-full max-w-2xl bg-red-900 rounded-full overflow-hidden mb-6 hidden border border-red-800">
+            <div id="progressFill" class="h-2 bg-gradient-to-r from-yellow-400 to-yellow-500 w-0 transition-all duration-500 ease-in-out shadow-[0_0_10px_rgba(250,204,21,0.8)]"></div>
+        </div>
+
+        <div class="flex items-center justify-center w-full max-w-5xl">
+            <button id="prevBtn" class="p-3 mx-2 hidden sm:block text-yellow-100 hover:text-yellow-400 disabled:opacity-30 transition duration-150" aria-label="Câu hỏi trước">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
+
+            <div id="quizCard" class="card-animate rounded-[1.5rem] w-full mx-auto cursor-pointer transform transition-all duration-300 p-6 sm:p-10" onclick="toggleAnswer()">
+                <div id="contentContainer">
+                    <p id="mainText" class="text-xl sm:text-3xl font-bold text-gray-800 text-center leading-relaxed"></p>
+                    <div id="answerSection" class="mt-6 pt-6 border-t-2 border-dashed border-yellow-300 hidden">
+                        <p class="text-lg sm:text-xl font-semibold text-gray-500 mb-2 text-center">Đáp án:</p>
+                        <p id="answerText" class="text-2xl sm:text-3xl font-extrabold text-red-600 text-center uppercase tracking-wide drop-shadow-sm"></p>
+                    </div>
+                </div>
+            </div>
+
+            <button id="nextBtn" class="p-3 mx-2 text-yellow-300 hover:text-yellow-400 disabled:opacity-30 transition duration-150" aria-label="Câu hỏi tiếp theo">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+        
+        <div class="flex sm:hidden mt-6">
+            <button id="prevBtnMobile" class="p-3 mx-2 text-yellow-100 hover:text-yellow-400 disabled:opacity-30 transition duration-150" aria-label="Câu hỏi trước">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor">
+                     <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            <button id="nextBtnMobile" class="p-3 mx-2 text-yellow-300 hover:text-yellow-400 disabled:opacity-30 transition duration-150" aria-label="Câu hỏi tiếp theo">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Màn hình chúc mừng năm mới -->
+        <div id="completionMessage" class="hidden mt-8 text-center bg-white/90 p-8 rounded-2xl border-4 border-yellow-400 shadow-2xl max-w-2xl mx-auto backdrop-blur-md">
+            <p class="text-4xl sm:text-5xl font-extrabold mb-4 celebration-text bg-gradient-to-r from-red-600 via-yellow-500 to-red-500 bg-clip-text text-transparent animate-pulse leading-tight">
+                🧨 CHÚC MỪNG NĂM MỚI! 🧨<br>
+                <span class="text-2xl sm:text-3xl mt-2 block">Cung Chúc Tân Xuân - Vạn Sự Như Ý</span>
+            </p>
+            <p class="text-xl font-semibold text-gray-800 mb-8 mt-4">Made by MC Hoàng Diệu Linh</p>
+            <button id="restartBtn" class="px-8 py-4 bg-gradient-to-r from-red-600 to-red-700 text-yellow-300 font-bold text-xl rounded-xl shadow-[0_4px_15px_rgba(220,38,38,0.6)] hover:from-red-500 hover:to-red-600 transition duration-300 transform hover:scale-[1.05] border border-red-400">
+                Chơi lại từ đầu 🔄
+            </button>
+        </div>
+    </div>
+
+    <!-- Container chứa hiệu ứng rơi -->
+    <div id="fallingContainer"></div>
+
+    <script>
+        // Dữ liệu bộ câu hỏi 
+        const quizData = [
+            { question: "Tên ba vị thần tượng trưng cho sự giàu sang, hạnh phúc và sức khỏe?", answer: "Ông Phúc, Lộc, Thọ." },
+            { question: "Hoa tượng trưng cho mùa xuân ở miền Bắc?", answer: "Hoa đào." },
+            { question: "Vị khách đầu tiên đến nhà chúc Tết được gọi là gì?", answer: "Người xông nhà (người xông đất)." },
+            { question: "Tết Nguyên Đán còn có tên gọi khác là gì?", answer: "Tết âm lịch (Tết ta)." },
+            { question: "Cái gì khiến hầu hết mọi người đều xem vào đêm giao thừa?", answer: "Pháo hoa." },
+            { question: "Trái gì xanh vỏ đỏ lòng?", answer: "Dưa hấu." },
+            { question: "Ngày Tết các thầy đồ thường làm gì?", answer: "Viết câu đối." },
+            { question: "Loại cây đặc trưng cho ngày Tết, không hoa, không trái mà ma quỷ rất sợ?", answer: "Cây nêu." },
+            { question: "Khoảnh khắc chuyển tiếp từ năm này sang năm khác gọi là gì?", answer: "Giao thừa." },
+            { question: "Tên của một mâm trái cây có 3 thứ quả không thể thiếu của các gia đình trong dịp Tết nói lên ước mong khiêm nhường không cầu kỳ cao sang lắm?", answer: "Mãng cầu, dừa, đu đủ." },
+            { question: "Sau khi chúc Tết các em nhỏ sẽ nhận được gì?", answer: "Lì xì." },
+            { question: "Hãy cho biết trong 12 con giáp thì con gì nổi tiếng nhờ phụ nữ?", answer: "Con dê." },
+            { question: "Nghi lễ diễn ra vào 23 tháng chạp âm lịch gọi là gì?", answer: "Cúng đưa ông Táo về trời." },
+            { question: "Bánh chưng làm bằng gạo gì?", answer: "Gạo nếp." },
+            { question: "Sau khi ăn Tết, hai người cha và 2 người con cùng đi săn, mỗi người săn được một con. Nhưng tổng số vịt là 3 con. Tại sao?", answer: "2 người cha và 2 người con là ông - bố và con. Chỉ có 3 người nên chỉ bắn 3 con vịt." },
+            { question: "Bánh chưng hình gì, tượng trưng cho cái gì?", answer: "Bánh chưng hình vuông và tượng trưng cho đất." },
+            { question: "Đây là hoạt động truyền thống mang lại sự may mắn của 2 con vật truyền thuyết biểu tượng của mùa xuân do các vũ công điều khiển.", answer: "Múa lân." },
+            { question: "Bánh trời, bánh đất là gì?", answer: "Bánh chưng, bánh giầy." },
+            { question: "Đây là một nghi lễ phong tục mà khi gặp nhau vào các ngày thường thực hiện và chào hỏi nhau.", answer: "Chúc Tết." },
+            { question: "Có nửa chai rượu, miệng nút chai bằng nút mềm. Không đạp chai rượu, không lấy nút, không khoan lỗ. Làm sao uống được.", answer: "Đẩy nút chai vào trong." },
+            { question: "Mâm ngũ quả cúng ngày Tết của miền Nam là những trái nào?", answer: "Cầu, dừa, đu đủ, xoài, sung." },
+            { question: "Ông Táo khi cưỡi cá chép bay về trời thì có đưa bà Táo đi chung không?", answer: "Cả 3 người cùng về trời." },
+            { question: "Vào ngày Tết mọi người cùng ăn gì?", answer: "Ăn Tết." },
+            { question: "Nước nào trên thế giới không có giao thừa: Việt Nam, Hàn Quốc hay Ấn Độ?", answer: "Nước nào cũng có giao thừa." },
+            { question: "Tóp mỡ, dưa hành, câu đối đỏ, cây nêu, tràng pháo, bánh chưng xanh. Câu này sai ở điểm nào?", answer: "Thịt mỡ không phải tóp mỡ." },
+            { question: "Ông nội đi chợ hoa xuân nhìn thấy trên cây có 1000 con chim, ông nội dùng cái gì để có thể tóm toàn bộ?", answer: "Lấy máy ảnh chụp ảnh." },
+            { question: "Bé Mai có thể biến toàn bộ cây xanh trong Hội Hoa Mai biến mất chỉ trong nháy mắt. Bé Mai đã làm gì?", answer: "Bé Mai đi ra khỏi Hội Hoa Xuân." },
+            { question: "Trong 12 tháng thì tháng nào mình được ngủ ít nhất?", answer: "Tháng 2 vì tháng 2 có 28 ngày ít nhất trong các tháng của năm." },
+            { question: "Tí, Sửu, Dần, Mão, Thìn, Tỵ, Ngựa, Mùi, Thân, Dậu, Tuất, Hợi điểm nào sai trong câu trên?", answer: "Ngựa là Ngọ." },
+            { question: "Theo truyền thuyết dân gian, Nhà Táo có 2 ông 1 bà hay 2 bà 1 ông hay 2 ông 2 bà?", answer: "2 ông 1 bà." },
+            { question: "Ở đâu không có Tết: Vũng Tàu, Đắk Lắk hay Đà Lạt?", answer: "Cả ba nơi đều có Tết." },
+            { question: "Vạn sự như ý - Vạn sự khởi đầu nan - Vạn Hạnh Mall. Đâu là câu chúc Tết?", answer: "Vạn sự như ý." },
+            { question: "Theo truyền thuyết dân gian, Ông Táo về trời bằng máy bay, tàu lượn siêu tốc hay phi thuyền?", answer: "Cá chép." },
+            { question: "Người ta dùng bút gì để viết thiệp chúc mừng năm mới: Bút bi, bút long hay bút chì?", answer: "Cả 3 bút đều có thể viết." },
+            { question: "Chúc mừng năm mới trong tiếng anh gọi là “Happy birthday”,”Happy ending” hay “Happy Polla”?", answer: "Không có trong 3 từ trên mà là “Happy new year”." },
+            { question: "Bánh chưng, bánh giầy, bánh gai bánh nào người ta hay ăn trong dịp Tết?", answer: "Bánh chưng, bánh giầy." },
+            { question: "Người Việt Nam có Tết Tây vậy người Tây có Tết Ta hay không?", answer: "Không." },
+            { question: "Người Việt Nam ở bên Tây có ăn Tết Ta hay không?", answer: "Có." },
+            { question: "Bánh chưng, bánh giầy bánh nào tượng trưng cho đất?", answer: "Bánh chưng." },
+            { question: "Bánh chưng, bánh giầy bánh nào tượng trưng cho trời?", answer: "Bánh giầy." },
+            { question: "Bánh giầy được làm bằng gạo gì?", answer: "Gạo nếp." },
+            { question: "Năm 2021 là năm con gì?", answer: "Con trâu." },
+            { question: "Bánh chưng hình gì, tượng trưng cho cái gì?", answer: "Bánh chưng hình vuông và tượng trưng cho đất." },
+            { question: "Bánh giầy hình gì, tượng trưng cho cái gì?", answer: "Bánh giầy hình tròn và tượng trưng cho trời." },
+            { question: "Mẹ của Thủy có 4 người con, bà muốn viết tên lên các bao lì xì để tặng cho từng người. Người thứ nhất tên là Đại Bảo, người thứ hai là Nhị Bảo, người thứ 3 là Tam Bảo. Vậy người còn lại tên gì?", answer: "Người còn lại tên Thủy." },
+            { question: "Một người muốn gởi 1 khúc gỗ quý dài 1m cho 1 người bạn bằng cách gửi nhờ 1 chuyến xe. Thế nhưng chiếc xe nhỏ và ngày Tết đông khách, chủ xe chỉ bằng lòng nhận gói đồ không dài hoặc rộng quá 50cm. Theo bạn người ấy phải làm cách nào?", answer: "Dựng đứng khúc gỗ lên." },
+            { question: "Tết Nguyên Đán được tính theo lịch dương hay lịch âm?", answer: "Lịch âm." },
+            { question: "Dân ta dùng bánh dầy và bánh chưng để làm gì?", answer: "Để cúng tổ tiên vào ngày Tết." },
+            { question: "Câu chuyện bánh chưng bánh dầy xảy ra vào đời vua Hùng thứ mấy?", answer: "Vào thời Hùng Vương thứ 6." },
+            { question: "Tại sao dân ta dùng bánh dầy và bánh chưng để cúng tổ tiên?", answer: "Để ví công lao tổ tiên to lớn như Trời và Đất." },
+            { question: "Cho biết hai nhân vật chính trong câu chuyện bánh chưng bánh dầy?", answer: "Hoàng tử Tiết Liêu và vua Hùng." },
+            { question: "Bánh chưng, bánh giầy được gói bằng lá gì?", answer: "Lá chuối." },
+            { question: "Vào ngày mồng 1 Tết, dân ta thường kiêng làm gì?", answer: "Kiêng quét nhà, dọn dẹp." },
+            { question: "Là quả mới thật lạ, nhưng mà thích được bay, khi nào bắn cao vút, tỏa sáng lòa trời mây. Là gì?", answer: "Pháo hoa." },
+            { question: "Tại sao trước Tết, người Việt lại dọn dẹp nhà cửa?", answer: "Dọn dẹp nhà cửa để dọn sạch những xui xẻo, rắc rối của năm cũ và có không gian thoáng đãng cho những niềm vui, may mắn đến vào năm mới." },
+            { question: "Tại sao cúng ông Táo lại có cá chép?", answer: "Cá chép là phương tiện cho ông Táo về trời và bày tỏ mong muốn gia đình mình trong năm mới cũng sẽ “cá chép hóa rồng”, phát triển thuận lợi." },
+            { question: "Tại sao thường có múa lân vào dịp Tết?", answer: "Để xua đuổi những điều xui xẻo, giúp may mắn đến, làm ăn suôn sẻ." },
+            { question: "Tại sao phải mừng tuổi, lì xì đầu năm?", answer: "Mục đích của việc lì xì là lời chúc may mắn. Mỗi bao lì xì là một lời chúc tốt lành của người cho, mong muốn các người nhận khỏe mạnh, không bệnh tật trong suốt một năm." },
+            { question: "Tại sao người ta thường nuôi heo đất sau Tết?", answer: "Ý nghĩa sâu xa của việc này là mong muốn giáo dục các đứa trẻ biết cách tiêu xài tiền hiệu quả, không phung phí." },
+            { question: "Bánh chưng thường có nhân gì?", answer: "Thịt và đậu xanh." },
+            { question: "Bánh chưng, bánh giầy bánh nào tượng trưng cho đất?", answer: "Bánh chưng." },
+            { question: "Lá dứa, lá dừa, lá dong lá nào dung để gói bánh chưng?", answer: "Lá dong." },
+            { question: "Tết năm nay, bé Xuân 9 tuổi, anh trai bé Xuân 12 tuổi. Hỏi 5 năm sau anh trai bé Xuân sẽ hơn bé Xuân mấy tuổi?", answer: "3 tuổi." },
+            { question: "Bánh Chưng Bánh Tét, Bánh Chưng Bánh Giò đâu là tên của sự tích dân gian Việt Nam?", answer: "Không có cái nào, đó là Bánh Chưng Bánh Giầy." },
+            { question: "Muốn ăn bánh chưng thì sẽ ăn vào ngày Tết hay là Noel?", answer: "Ngày Tết truyền thống, hoặc ăn vào ngày Noel hay ngày bình thường khác cũng được." },
+            { question: "Nhà bé Mai có 2 chị em. Ngày Tết bé Mai phụ mẹ gói bánh chưng. Hỏi anh bé Mai đang làm gì?", answer: "Không có anh bé Mai." },
+            { question: "Làm thế nào để bỏ 8 cái bánh chưng vào trong 5 cái túi, mà số bánh chưng trong mỗi túi đều phải là số chẵn?", answer: "Cắt 8 cái bánh chưng ra, mỗi cái cắt thành 5 phần bằng nhau và cho vào mỗi túi. Kết quả thu về vẫn là con số chẵn." },
+            { question: "Xông hơi, xông pha, xông đất, tăng xông cái nào là tên gọi của 1 phong tục ngày Tết?", answer: "Xông đất." },
+            { question: "Người xông đất là người xông vô nhà mình, nhảy vô nhà mình hay là lẻn vô nhà mình sau thời khắc giao thừa?", answer: "Bước vô nhà mình đầu tiên." },
+            { question: "Hầu hết mọi người đều xem vào đêm giao thừa. Là cái gì ?", answer: "Pháo hoa." },
+            { question: "Vào ngày Tết, trẻ em được nhận gì?", answer: "Nhận lì xì." },
+            { question: "Vào ngày Tết, mọi người thường đi đâu để cầu chúc sức khỏe, may mắn?", answer: "Đi chùa." },
+            { question: "Trước Tết, người Việt tổ chức một bữa tiệc gọi là gì?", answer: "Tiệc tất niên." },
+            { question: "Ở miền Nam, người Việt thường mua hoa gì để trang trí nhà dịp Tết?", answer: "Hoa mai." },
+            { question: "Công việc mà các thầy đồ thường làm vào ngày Tết?", answer: "Viết chữ, câu đối ngày Tết." },
+            { question: "Tại sao quét nhà trong dịp Tết là điều kiêng kỵ?", answer: "Vì mọi người quan niệm rằng đấy là quét đi may mắn." },
+            { question: "Ở miền Bắc, lẵng trái cây trang trí cho dịp Tết gồm có gì?", answer: "Gồm có chuối, đào, quýt, bưởi và hồng." },
+            { question: "Trong ngày đầu năm, trẻ em thường làm gì?", answer: "Trẻ em mặc quần áo mới và chúc Tết người lớn trước khi nhận tiền lì xì." },
+            { question: "Tết Nguyên đán còn có tên gọi khác là gì?", answer: "Tết Âm lịch." },
+            { question: "Con gì tới 12 giờ khuya thì có lúc thay đổi kích thước từ nhỏ qua to hoặc từ to qua nhỏ?", answer: "Con giáp." },
+            { question: "Con gì phi nước đại, trung thành với chủ, là biểu tượng của năm 2026?", answer: "Con Ngựa." },
+            { question: "Ngựa gì không bao giờ ăn cỏ, không uống nước, mà lại biết bay?", answer: "Ngựa sắt (của Thánh Gióng) hoặc Ngựa trời (Bọ ngựa)." },
+            { question: "Ngựa gì mặc áo kẻ sọc đen trắng?", answer: "Ngựa vằn." },
+            { question: "Có một đàn ngựa điếc đi qua một cây cầu gỗ. Hỏi đàn ngựa có mấy con?", answer: "12 con (Điếc là hư tai -> Hư tai là hai tư -> 24 chân -> 6 con. Hoặc chơi chữ: Điếc là hư tai -> Hư tai là hai tư -> 24 con)." },
+            { question: "Giờ Ngọ là mấy giờ?", answer: "11h trưa - 13h chiều." }
+        ];
+
+        let currentQuestionIndex = 0;
+        let isAnswerVisible = false;
+
+        const quizCard = document.getElementById('quizCard');
+        const mainTextEl = document.getElementById('mainText');
+        const answerSectionEl = document.getElementById('answerSection');
+        const answerTextEl = document.getElementById('answerText');
+        const nextBtn = document.getElementById('nextBtn');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtnMobile = document.getElementById('nextBtnMobile');
+        const prevBtnMobile = document.getElementById('prevBtnMobile');
+        const completionMessage = document.getElementById('completionMessage');
+        const restartBtn = document.getElementById('restartBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+
+        // Sinh hiệu ứng rơi (Hoa mai, đào, lì xì)
+        function initFallingEffect() {
+            const container = document.getElementById('fallingContainer');
+            const items = ['🌸', '🌼', '🧧', '✨', '🪙']; // Đào, Mai, Lì xì, Lấp lánh, Đồng tiền vàng
+            
+            setInterval(() => {
+                const el = document.createElement('div');
+                el.classList.add('falling-item');
+                el.innerText = items[Math.floor(Math.random() * items.length)];
+                
+                // Vị trí ngang ngẫu nhiên
+                el.style.left = Math.random() * 100 + 'vw';
+                
+                // Kích thước ngẫu nhiên
+                const size = Math.random() * 20 + 15;
+                el.style.fontSize = size + 'px';
+                
+                // Thời gian rơi ngẫu nhiên (chậm hay nhanh)
+                const duration = Math.random() * 5 + 4; 
+                el.style.animationDuration = duration + 's';
+                
+                container.appendChild(el);
+                
+                // Xóa phần tử sau khi rơi xong để tránh nặng bộ nhớ
+                setTimeout(() => {
+                    el.remove();
+                }, duration * 1000);
+            }, 300); // Tần suất rớt (số ms)
+        }
+
+        function renderQuestion() {
+            progressBar.classList.remove('hidden');
+            completionMessage.classList.add('hidden');
+            quizCard.classList.remove('hidden');
+            nextBtn.classList.remove('hidden');
+            prevBtn.classList.remove('hidden');
+            nextBtnMobile.classList.remove('hidden');
+            prevBtnMobile.classList.remove('hidden');
+
+            const currentItem = quizData[currentQuestionIndex];
+            mainTextEl.textContent = currentItem.question;
+            
+            const progress = (currentQuestionIndex / quizData.length) * 100;
+            progressFill.style.width = `${progress}%`;
+
+            answerSectionEl.classList.add('hidden');
+            answerSectionEl.classList.remove('visible'); 
+            mainTextEl.classList.remove('text-gray-400'); 
+            quizCard.classList.remove('card-flipped');
+            isAnswerVisible = false;
+
+            updateNavigationButtons();
+            
+            quizCard.classList.remove('card-animate');
+            void quizCard.offsetWidth; 
+            quizCard.classList.add('card-animate');
+        }
+
+        function toggleAnswer() {
+            if (currentQuestionIndex >= quizData.length) return;
+
+            isAnswerVisible = !isAnswerVisible;
+            const currentItem = quizData[currentQuestionIndex];
+            
+            if (isAnswerVisible) {
+                answerTextEl.textContent = currentItem.answer;
+                answerSectionEl.classList.remove('hidden');
+                answerSectionEl.classList.add('visible'); 
+                mainTextEl.classList.add('text-gray-400'); // Làm mờ nhẹ câu hỏi
+                quizCard.classList.add('card-flipped'); 
+            } else {
+                answerSectionEl.classList.add('hidden');
+                answerSectionEl.classList.remove('visible'); 
+                mainTextEl.classList.remove('text-gray-400');
+                quizCard.classList.remove('card-flipped');
+            }
+        }
+
+        function nextQuestion() {
+            if (currentQuestionIndex < quizData.length - 1) {
+                currentQuestionIndex++;
+                setTimeout(renderQuestion, 200); 
+            } else if (currentQuestionIndex === quizData.length - 1) {
+                showCompletion();
+            }
+            updateNavigationButtons(); 
+        }
+
+        function prevQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                setTimeout(renderQuestion, 200); 
+            }
+            updateNavigationButtons();
+        }
+
+        function updateNavigationButtons() {
+            const isDisabledPrev = currentQuestionIndex === 0;
+            prevBtn.disabled = isDisabledPrev;
+            prevBtnMobile.disabled = isDisabledPrev;
+
+            const isDisabledNext = currentQuestionIndex >= quizData.length;
+            nextBtn.disabled = isDisabledNext;
+            nextBtnMobile.disabled = isDisabledNext;
+        }
+
+        function showCompletion() {
+            progressFill.style.width = '100%';
+            
+            quizCard.classList.add('hidden');
+            nextBtn.classList.add('hidden');
+            prevBtn.classList.add('hidden');
+            nextBtnMobile.classList.add('hidden');
+            prevBtnMobile.classList.add('hidden');
+            progressBar.classList.add('hidden'); 
+            
+            completionMessage.classList.remove('hidden');
+            currentQuestionIndex = quizData.length; 
+            updateNavigationButtons();
+            
+            // Bắn Confetti tone màu Đỏ - Vàng ngày Tết
+            if (typeof confetti !== 'undefined') {
+                const colors = ['#ff0000', '#ffd700', '#ff8c00', '#ff4500']; // Đỏ, Vàng, Cam
+                
+                const fire = (particleRatio, opts) => {
+                    confetti({
+                        ...opts,
+                        colors: colors,
+                        origin: { y: 0.7 },
+                        particleCount: Math.floor(250 * particleRatio),
+                        spread: 260,
+                        ticks: 500,
+                        angle: 60 + (Math.random() * 60)
+                    });
+                }
+                
+                fire(0.25, { spread: 26, startVelocity: 55 });
+                setTimeout(() => { fire(0.35, { spread: 60, startVelocity: 55 }); }, 100);
+                setTimeout(() => { 
+                    fire(0.4, { 
+                        spread: 120, 
+                        startVelocity: 45, 
+                        scalar: 0.9, 
+                        shapes: ['circle', 'square', 'star'] 
+                    }); 
+                }, 200);
+            }
+        }
+
+        function restartGame() {
+            currentQuestionIndex = 0;
+            progressFill.style.width = '0%';
+            renderQuestion();
+        }
+
+        nextBtn.addEventListener('click', nextQuestion);
+        nextBtnMobile.addEventListener('click', nextQuestion);
+        prevBtn.addEventListener('click', prevQuestion);
+        prevBtnMobile.addEventListener('click', prevQuestion);
+        restartBtn.addEventListener('click', restartGame);
+
+        window.onload = () => {
+            renderQuestion();
+            initFallingEffect(); // Chạy hiệu ứng rơi khi load xong
+        };
+    </script>
+</body>
+</html>
